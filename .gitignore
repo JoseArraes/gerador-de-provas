@@ -1,0 +1,11 @@
+# respostas e gabaritos reais de alunos: nunca subir
+*.json
+resposta-*.json
+gabarito*.json
+
+# provas geradas
+prova*.html
+
+# IDE
+.idea/
+.vscode/

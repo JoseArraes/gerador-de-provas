@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Gerador de Provas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#1B3355; --navy-2:#2A4A73; --blue:#3E7CB8; --blue-light:#EAF2FA; --blue-border:#4A90C4;
+    --ink:#1F2937; --ink-soft:#5B6470; --paper:#FFFFFF; --canvas:#F3F5F8; --line:#E1E6ED;
+    --green:#1C8A5C; --green-bg:#E6F7EE; --red:#C13B2E; --red-bg:#FBEAE8; --amber:#B9791E; --amber-bg:#FBF2E3;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; font-family:'Source Sans 3', sans-serif; background:var(--canvas); color:var(--ink);}
+  .app{display:grid; grid-template-columns:420px 1fr; min-height:100vh;}
+  @media (max-width:900px){.app{grid-template-columns:1fr;}}
+
+  .editor{background:var(--paper); border-right:1px solid var(--line); padding:28px 24px 40px; display:flex; flex-direction:column; gap:16px;}
+  .editor h1{font-family:'Space Grotesk',sans-serif; font-size:20px; color:var(--navy); margin:0 0 2px;}
+  .tag{display:inline-block; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--blue); background:var(--blue-light); padding:3px 9px; border-radius:20px; margin-bottom:10px;}
+  .field label{display:block; font-size:12.5px; font-weight:600; color:var(--ink-soft); margin-bottom:5px;}
+  .field input, .field textarea{width:100%; font-family:inherit; font-size:14px; padding:9px 11px; border:1px solid var(--line); border-radius:8px; color:var(--ink); background:#fff; resize:vertical;}
+  .field input:focus, .field textarea:focus{outline:none; border-color:var(--blue-border); box-shadow:0 0 0 3px rgba(74,144,196,.15);}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .grid3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;}
+  #raw{min-height:280px; font-family:'SF Mono',Consolas,monospace; font-size:12.5px; line-height:1.55;}
+  .help{font-size:11.5px; color:var(--ink-soft); background:var(--blue-light); border-left:3px solid var(--blue-border); padding:10px 12px; border-radius:0 6px 6px 0; line-height:1.5;}
+  .help code{background:rgba(0,0,0,.06); padding:1px 5px; border-radius:4px; font-size:11px;}
+  .btnrow{display:flex; gap:8px; margin-top:4px; flex-wrap:wrap;}
+  button{font-family:inherit; font-weight:600; font-size:13.5px; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; transition:transform .08s ease, opacity .15s ease;}
+  button:active{transform:scale(.97);}
+  .btn-primary{background:var(--navy); color:#fff; flex:1;}
+  .btn-primary:hover{background:var(--navy-2);}
+  .btn-ghost{background:#fff; color:var(--navy); border:1px solid var(--line);}
+  .btn-ghost:hover{border-color:var(--blue-border); color:var(--blue);}
+  .btn-download{background:var(--green); color:#fff; width:100%;}
+  .btn-download:hover{opacity:.9;}
+  .status{font-size:12px; color:var(--ink-soft); min-height:14px;}
+  .status.err{color:var(--red);}
+  .status.ok{color:var(--green);}
+  hr.sep{border:none; border-top:1px solid var(--line); margin:6px 0;}
+
+  .preview-wrap{padding:40px 24px 80px; display:flex; justify-content:center;}
+  .sheet{background:var(--paper); max-width:820px; width:100%; border-radius:14px; box-shadow:0 1px 3px rgba(20,30,50,.06), 0 12px 32px rgba(20,30,50,.06); padding:48px 56px 56px;}
+  @media (max-width:640px){.sheet{padding:32px 22px 40px;} .preview-wrap{padding:20px 10px 60px;}}
+  .doc-title{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:30px; text-align:center; color:var(--navy); letter-spacing:.01em; margin:0 0 8px;}
+  .doc-subtitle{text-align:center; color:var(--blue); font-size:18px; font-weight:600; margin:0 0 6px;}
+  .doc-meta{text-align:center; color:var(--ink-soft); font-size:13px; margin:0 0 22px;}
+  .doc-rule{height:3px; background:var(--navy); border-radius:2px; margin:0 0 26px;}
+  .doc-instructions{background:var(--blue-light); border-left:4px solid var(--blue-border); border-radius:0 10px 10px 0; padding:16px 20px; font-size:14px; line-height:1.55; color:#2E4256; margin-bottom:8px;}
+  .doc-instructions b{color:var(--navy);}
+
+  .progress-track{display:flex; gap:5px; margin:26px 0 6px; flex-wrap:wrap;}
+  .progress-dot{width:26px; height:26px; border-radius:7px; background:#EEF1F5; border:1px solid var(--line); color:var(--ink-soft); font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center;}
+  .progress-dot.answered{background:var(--blue); color:#fff; border-color:var(--blue);}
+  .progress-label{font-size:11.5px; color:var(--ink-soft); margin-bottom:2px;}
+
+  .question{padding:26px 0; border-bottom:1px solid var(--line);}
+  .question:last-of-type{border-bottom:none;}
+  .q-head{display:flex; align-items:baseline; gap:10px; margin-bottom:10px;}
+  .q-num{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:15px; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; white-space:nowrap;}
+  .q-peso{font-size:11px; font-weight:700; color:var(--amber); background:var(--amber-bg); padding:2px 8px; border-radius:20px;}
+  .q-text{font-weight:600; font-size:15.5px; color:var(--ink); line-height:1.5; margin:0 0 14px;}
+  .alternatives{display:flex; flex-direction:column; gap:9px;}
+  .alt{display:flex; align-items:center; gap:12px; padding:14px 16px; min-height:48px; border:1.5px solid var(--line); border-radius:10px; cursor:pointer; background:#fff; transition:border-color .15s ease, background .15s ease, transform .08s ease; touch-action:manipulation; -webkit-tap-highlight-color:transparent; user-select:none;}
+  .alt:hover{border-color:var(--blue-border); background:var(--blue-light);}
+  .alt:active{transform:scale(.98); border-color:var(--blue-border);}
+  .alt-letter{width:30px; height:30px; flex:none; border-radius:7px; background:#EEF1F5; color:var(--ink-soft); font-size:13px; font-weight:700; display:flex; align-items:center; justify-content:center; transition:all .15s ease;}
+  .alt-text{font-size:15px; color:#2E4256; line-height:1.45;}
+  .alt.selected{border-color:var(--blue-border); background:var(--blue-light);}
+  .alt.selected .alt-letter{background:var(--blue); color:#fff;}
+  .alt.is-correct{border-color:var(--green); background:var(--green-bg);}
+  .alt.is-correct .alt-letter{background:var(--green); color:#fff;}
+
+  .empty-state{text-align:center; color:var(--ink-soft); font-size:14px; padding:60px 20px;}
+  .doc-footer{margin-top:34px; padding-top:18px; border-top:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; font-size:12px; color:var(--ink-soft);}
+
+  @media (max-width:640px){
+    .q-text{font-size:16px;}
+    .doc-title{font-size:24px;}
+    .doc-subtitle{font-size:16px;}
+    .progress-dot{width:30px; height:30px; font-size:12px;}
+    button, input, select, textarea{font-size:16px;} /* evita zoom automático do iOS ao focar */
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="editor">
+    <div>
+      <span class="tag">Fase 1 · Gerador de Provas</span>
+      <h1>Monte sua prova</h1>
+    </div>
+
+    <div class="field"><label>Título da prova</label><input id="f-title" value="Prova de Fixação"></div>
+    <div class="grid2">
+      <div class="field"><label>Disciplina</label><input id="f-disciplina" value="Edição de Imagens Digitais"></div>
+      <div class="field"><label>Professor</label><input id="f-professor" value=""></div>
+    </div>
+    <div class="grid3">
+      <div class="field"><label>Turma</label><input id="f-turma" value=""></div>
+      <div class="field"><label>Tempo</label><input id="f-tempo" placeholder="ex: 50 min" value=""></div>
+      <div class="field"><label>Data</label><input id="f-data" type="date"></div>
+    </div>
+    <div class="field"><label>Instruções</label><textarea id="f-instructions" rows="2">Responda todas as questões clicando na alternativa escolhida.</textarea></div>
+
+    <div class="field">
+      <label>Questões</label>
+      <textarea id="raw" spellcheck="false">O que são pixels em uma imagem digital?
+A) Pequenos arquivos de áudio embutidos na imagem
+*B) Pontos microscópicos de cor que formam a imagem
+C) Códigos de programação usados para criar efeitos
+D) Pequenas animações que se repetem automaticamente
+peso: 1
+
+Uma imagem com resolução de 1920 x 1080 pixels é comumente utilizada em:
+A) Ícones pequenos e miniaturas
+B) Redes sociais como TikTok
+*C) Vídeos e displays em qualidade Full HD
+D) Impressão de cartazes largos
+peso: 2</textarea>
+    </div>
+
+    <div class="help">
+      Uma questão por bloco, separado por <b>linha em branco</b>. 1ª linha = enunciado.
+      Alternativas: <code>A)</code> <code>B)</code> <code>C)</code>... Marque a correta com <code>*</code>: <code>*B) texto</code>.
+      Peso opcional (padrão 1): <code>peso: 2</code>
+    </div>
+
+    <div class="btnrow">
+      <button class="btn-primary" onclick="renderFromInput()">Gerar prévia</button>
+      <button class="btn-ghost" onclick="addBlankQuestion()">+ questão em branco</button>
+    </div>
+    <div id="status" class="status"></div>
+
+    <hr class="sep">
+    <button class="btn-download" onclick="downloadStandalone()">⬇ Gerar prova (prova.html + gabarito.json)</button>
+    <div class="status">Gera dois arquivos: a prova para o aluno responder (sem gabarito) e o gabarito para você corrigir depois no Corretor.</div>
+  </div>
+
+  <div class="preview-wrap">
+    <div class="sheet" id="sheet">
+      <h1 class="doc-title" id="v-title">Prova de Fixação</h1>
+      <p class="doc-subtitle" id="v-subtitle"></p>
+      <p class="doc-meta" id="v-meta"></p>
+      <div class="doc-rule"></div>
+      <div class="doc-instructions"><b>📋 INSTRUÇÕES:</b> <span id="v-instructions"></span></div>
+
+      <div class="progress-label">Progresso (prévia — não conta para nota)</div>
+      <div class="progress-track" id="progress"></div>
+
+      <div id="questions"></div>
+
+      <div class="doc-footer">
+        <span id="score-line">0 de 0 respondidas</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let questions = [];
+
+function parseRaw(text){
+  const blocks = text.split(/\n\s*\n/).map(b=>b.trim()).filter(Boolean);
+  const out = [];
+  blocks.forEach(block=>{
+    const lines = block.split('\n').map(l=>l.trim()).filter(Boolean);
+    let peso = 1;
+    const contentLines = [];
+    lines.forEach(line=>{
+      const pm = line.match(/^peso\s*:\s*([\d.]+)/i);
+      if(pm){ peso = parseFloat(pm[1]); return; }
+      contentLines.push(line);
+    });
+    if(contentLines.length < 3) return;
+    const qtext = contentLines[0];
+    const alts = [];
+    let correctIndex = -1;
+    contentLines.slice(1).forEach(line=>{
+      let l = line;
+      let isCorrect = false;
+      if(l.startsWith('*')){ isCorrect = true; l = l.slice(1).trim(); }
+      const m = l.match(/^([A-Za-z])\)\s*(.+)$/);
+      if(m){
+        if(isCorrect) correctIndex = alts.length;
+        alts.push(m[2]);
+      }
+    });
+    if(alts.length >= 2){
+      out.push({q: qtext, alts, correct: correctIndex, peso});
+    }
+  });
+  return out;
+}
+
+function renderFromInput(){
+  const raw = document.getElementById('raw').value;
+  const parsed = parseRaw(raw);
+  const statusEl = document.getElementById('status');
+  if(parsed.length === 0){
+    statusEl.textContent = 'Não encontrei nenhuma questão válida — confira o formato.';
+    statusEl.className = 'status err';
+    return;
+  }
+  const semGabarito = parsed.some(q=>q.correct < 0);
+  questions = parsed;
+  statusEl.textContent = semGabarito
+    ? `${parsed.length} questão(ões) geradas — atenção: alguma questão está sem alternativa correta marcada (*).`
+    : `${parsed.length} questão(ões) geradas.`;
+  statusEl.className = semGabarito ? 'status err' : 'status ok';
+  renderSheet();
+}
+
+function addBlankQuestion(){
+  const ta = document.getElementById('raw');
+  const sep = ta.value.trim().length ? '\n\n' : '';
+  ta.value += `${sep}Nova pergunta aqui\nA) alternativa 1\n*B) alternativa 2 (correta)\nC) alternativa 3\nD) alternativa 4\npeso: 1`;
+  renderFromInput();
+}
+
+function buildMetaLine(){
+  const parts = [];
+  const professor = document.getElementById('f-professor').value.trim();
+  const turma = document.getElementById('f-turma').value.trim();
+  const data = document.getElementById('f-data').value;
+  const tempo = document.getElementById('f-tempo').value.trim();
+  if(professor) parts.push('Professor(a): '+professor);
+  if(turma) parts.push('Turma: '+turma);
+  if(data) parts.push('Data: '+formatDate(data));
+  if(tempo) parts.push('Tempo: '+tempo);
+  return parts.join('  |  ');
+}
+function formatDate(iso){
+  const [y,m,d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+function renderSheet(){
+  document.getElementById('v-title').textContent = document.getElementById('f-title').value;
+  document.getElementById('v-subtitle').textContent = document.getElementById('f-disciplina').value;
+  document.getElementById('v-meta').textContent = buildMetaLine();
+  document.getElementById('v-instructions').textContent = document.getElementById('f-instructions').value;
+
+  const qWrap = document.getElementById('questions');
+  const progWrap = document.getElementById('progress');
+  qWrap.innerHTML = '';
+  progWrap.innerHTML = '';
+
+  if(questions.length === 0){
+    qWrap.innerHTML = '<div class="empty-state">Cole suas questões à esquerda e clique em "Gerar prévia".</div>';
+    updateScoreLine();
+    return;
+  }
+
+  const letters = ['A','B','C','D','E','F'];
+
+  questions.forEach((q, qi)=>{
+    const qDiv = document.createElement('div');
+    qDiv.className = 'question';
+    qDiv.id = `q-${qi}`;
+
+    const head = document.createElement('div');
+    head.className = 'q-head';
+    head.innerHTML = `<span class="q-num">Questão ${qi+1}</span><span class="q-peso">peso ${q.peso}</span>`;
+    qDiv.appendChild(head);
+
+    const qText = document.createElement('p');
+    qText.className = 'q-text';
+    qText.textContent = q.q;
+    qDiv.appendChild(qText);
+
+    const altsWrap = document.createElement('div');
+    altsWrap.className = 'alternatives';
+    q.alts.forEach((altText, ai)=>{
+      const altDiv = document.createElement('div');
+      altDiv.className = 'alt';
+      altDiv.dataset.ai = ai;
+      altDiv.innerHTML = `<span class="alt-letter">${letters[ai]}</span><span class="alt-text">${altText}</span>`;
+      altDiv.addEventListener('click', ()=>{
+        qDiv.querySelectorAll('.alt').forEach(el=>el.classList.remove('selected'));
+        altDiv.classList.add('selected');
+        document.getElementById(`dot-${qi}`).classList.add('answered');
+        updateScoreLine();
+      });
+      altsWrap.appendChild(altDiv);
+    });
+    qDiv.appendChild(altsWrap);
+    qWrap.appendChild(qDiv);
+
+    const dot = document.createElement('div');
+    dot.className = 'progress-dot';
+    dot.id = `dot-${qi}`;
+    dot.textContent = qi+1;
+    progWrap.appendChild(dot);
+  });
+
+  updateScoreLine();
+}
+
+function updateScoreLine(){
+  const total = questions.length;
+  const answered = document.querySelectorAll('.alt.selected').length;
+  document.getElementById('score-line').textContent = `${answered} de ${total} respondidas`;
+}
+
+['f-title','f-disciplina','f-professor','f-turma','f-tempo','f-data','f-instructions'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', renderSheet);
+});
+
+function slugify(str){
+  return (str||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'') || 'prova';
+}
+function triggerDownload(filename, content, mime){
+  const blob = new Blob([content], {type:mime});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+function escapeHTML(str){
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+function downloadStandalone(){
+  const statusEl = document.getElementById('status');
+  if(questions.length === 0){
+    statusEl.textContent = 'Gere a prévia antes de baixar.';
+    statusEl.className = 'status err';
+    return;
+  }
+  if(questions.some(q=>q.correct < 0)){
+    statusEl.textContent = 'Corrija: existe questão sem alternativa correta marcada com *.';
+    statusEl.className = 'status err';
+    return;
+  }
+
+  const title = document.getElementById('f-title').value;
+  const disciplina = document.getElementById('f-disciplina').value;
+  const professor = document.getElementById('f-professor').value;
+  const turma = document.getElementById('f-turma').value;
+  const tempo = document.getElementById('f-tempo').value;
+  const data = document.getElementById('f-data').value;
+  const instructions = document.getElementById('f-instructions').value;
+  const quizId = `${slugify(title)}-${Date.now().toString(36)}`;
+
+  // ---------- gabarito.json ----------
+  const gabarito = {
+    tipo: 'gabarito', quizId, title, disciplina, professor, turma, tempo, data,
+    generatedAt: new Date().toISOString(),
+    questions: questions.map(q => ({ q: q.q, alts: q.alts, correct: q.correct, peso: q.peso }))
+  };
+  triggerDownload('gabarito.json', JSON.stringify(gabarito, null, 2), 'application/json');
+
+  // ---------- prova.html ----------
+  const styleTag = document.querySelector('style').outerHTML;
+  const letters = ['A','B','C','D','E','F'];
+
+  const questionsHTML = questions.map((q, qi) => `
+    <div class="question" id="q-${qi}">
+      <div class="q-head"><span class="q-num">Questão ${qi+1}</span><span class="q-peso">peso ${q.peso}</span></div>
+      <p class="q-text">${escapeHTML(q.q)}</p>
+      <div class="alternatives">
+        ${q.alts.map((alt, ai) => `
+          <div class="alt" data-ai="${ai}">
+            <span class="alt-letter">${letters[ai]}</span>
+            <span class="alt-text">${escapeHTML(alt)}</span>
+          </div>`).join('')}
+      </div>
+    </div>`).join('');
+
+  const progressHTML = questions.map((q, qi) => `<div class="progress-dot" id="dot-${qi}">${qi+1}</div>`).join('');
+
+  const studentScript = `<script>
+    const quizId = ${JSON.stringify(quizId)};
+    const quizMeta = ${JSON.stringify({title, disciplina, professor, turma, tempo, data})};
+    const totalQuestions = ${questions.length};
+    let finished = false;
+
+    function selectAlt(qi, ai){
+      if(finished) return;
+      const qDiv = document.getElementById('q-'+qi);
+      qDiv.querySelectorAll('.alt').forEach(el=>{
+        el.classList.toggle('selected', Number(el.dataset.ai) === ai);
+      });
+      qDiv.dataset.chosen = ai;
+      document.getElementById('dot-'+qi).classList.add('answered');
+      updateScoreLine();
+    }
+    function updateScoreLine(){
+      const answered = document.querySelectorAll('.question[data-chosen]').length;
+      document.getElementById('score-line').textContent = answered+' de '+totalQuestions+' respondidas';
+    }
+    document.querySelectorAll('.alt').forEach(el=>{
+      const qDiv = el.closest('.question');
+      const qi = Number(qDiv.id.split('-')[1]);
+      const ai = Number(el.dataset.ai);
+      el.addEventListener('click', ()=>selectAlt(qi, ai));
+    });
+
+    let savedFile = null, savedBlob = null, savedJsonStr = null, savedFilename = null;
+
+    function finalizarProva(){
+      const name = document.getElementById('student-name').value.trim();
+      const numero = document.getElementById('student-numero').value.trim();
+      const turmaAluno = document.getElementById('student-turma').value.trim();
+      if(!name){
+        document.getElementById('student-name').focus();
+        alert('Escreva seu nome antes de finalizar a prova.');
+        return;
+      }
+      const answered = document.querySelectorAll('.question[data-chosen]').length;
+      if(answered < totalQuestions){
+        const ok = confirm('Você respondeu '+answered+' de '+totalQuestions+' questões. Deseja finalizar mesmo assim?');
+        if(!ok) return;
+      }
+      finished = true;
+      document.querySelectorAll('.question').forEach(q=>q.classList.add('locked'));
+      document.querySelectorAll('.name-field input').forEach(i=>i.disabled = true);
+
+      const answers = [];
+      document.querySelectorAll('.question').forEach(qDiv=>{
+        const chosen = qDiv.dataset.chosen;
+        answers.push(chosen === undefined ? null : Number(chosen));
+      });
+
+      const payload = {
+        tipo: 'respostas', quizId,
+        title: quizMeta.title, disciplina: quizMeta.disciplina, professor: quizMeta.professor,
+        studentName: name, studentNumero: numero, studentTurma: turmaAluno,
+        submittedAt: new Date().toISOString(), answers
+      };
+      const firstName = name.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').split(/\\s+/)[0].replace(/[^a-z0-9]/g,'');
+
+      savedJsonStr = JSON.stringify(payload, null, 2);
+      savedFilename = 'resposta-'+(firstName||'aluno')+'.json';
+      savedBlob = new Blob([savedJsonStr], {type:'application/json'});
+      try{ savedFile = new File([savedBlob], savedFilename, {type:'application/json'}); }catch(e){ savedFile = null; }
+
+      document.getElementById('finish-btn').style.display = 'none';
+      document.getElementById('done-msg').style.display = 'block';
+      document.getElementById('fallback-json').value = savedJsonStr;
+
+      entregarArquivo();
+    }
+
+    async function entregarArquivo(){
+      // 1) tenta o compartilhamento nativo do celular (funciona no iPhone/Android e permite
+      //    salvar em Arquivos, mandar por WhatsApp, e-mail etc. direto para o professor)
+      if(navigator.canShare && savedFile && navigator.canShare({files:[savedFile]})){
+        try{
+          await navigator.share({files:[savedFile], title: savedFilename, text:'Resposta da prova - '+quizMeta.title});
+          return;
+        }catch(err){
+          // usuário cancelou o compartilhamento ou falhou -> tenta baixar
+        }
+      }
+      // 2) tenta o download clássico (funciona bem no computador e Android/Chrome)
+      try{
+        const url = URL.createObjectURL(savedBlob);
+        const a = document.createElement('a');
+        a.href = url; a.download = savedFilename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(()=>URL.revokeObjectURL(url), 3000);
+      }catch(err){ /* segue para o fallback de copiar texto, que sempre aparece na tela */ }
+    }
+
+    function copiarRespostas(){
+      const ta = document.getElementById('fallback-json');
+      ta.select();
+      ta.setSelectionRange(0, 999999);
+      let copiado = false;
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(savedJsonStr).then(()=>{ marcarCopiado(); }).catch(()=>{ tentarCopyFallback(ta); });
+        copiado = true;
+      }
+      if(!copiado) tentarCopyFallback(ta);
+    }
+    function tentarCopyFallback(ta){
+      try{ document.execCommand('copy'); marcarCopiado(); }catch(e){ alert('Selecione o texto acima manualmente e copie.'); }
+    }
+    function marcarCopiado(){
+      const btn = document.getElementById('copy-btn');
+      const original = btn.textContent;
+      btn.textContent = '✓ Copiado!';
+      setTimeout(()=>{ btn.textContent = original; }, 2000);
+    }
+  <\/script>`;
+
+  const studentHTML = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${escapeHTML(title)}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
+${styleTag}
+<style>
+  body{background:var(--canvas); padding:40px 16px;}
+  .info-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:18px 0 4px;}
+  .name-field label{display:block; font-size:12px; font-weight:600; color:var(--ink-soft); margin-bottom:5px;}
+  .name-field input{width:100%; font-family:inherit; font-size:16px; padding:12px; border:1.5px solid var(--line); border-radius:8px; -webkit-tap-highlight-color:transparent;}
+  .name-field input:focus{outline:none; border-color:var(--blue-border); box-shadow:0 0 0 3px rgba(74,144,196,.15);}
+  .name-field .static{padding:12px; font-size:15px; color:var(--ink-soft); background:#F7F9FB; border-radius:8px; border:1.5px solid var(--line);}
+  #finish-btn{background:var(--navy); color:#fff; font-size:15px; padding:13px 22px; border:none; border-radius:8px; cursor:pointer; font-weight:600; touch-action:manipulation; -webkit-tap-highlight-color:transparent;}
+  #finish-btn:hover{background:var(--navy-2);}
+  #finish-btn:active{transform:scale(.98);}
+  #done-msg{display:none; background:var(--green-bg); color:var(--green); border-left:4px solid var(--green); padding:14px 18px; border-radius:0 8px 8px 0; font-size:14px; margin-top:20px;}
+  #done-msg .actions{display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;}
+  #done-msg button{font-family:inherit; font-weight:600; font-size:13px; padding:9px 14px; border-radius:7px; border:1px solid var(--green); background:#fff; color:var(--green); cursor:pointer;}
+  #done-msg button:hover{background:var(--green); color:#fff;}
+  #done-msg .fallback-hint{font-size:12.5px; color:var(--ink-soft); margin-top:14px;}
+  #fallback-json{width:100%; min-height:90px; font-family:'SF Mono',Consolas,monospace; font-size:11.5px; margin-top:6px; padding:10px; border-radius:8px; border:1px solid var(--line); color:var(--ink-soft); resize:vertical;}
+
+  @media (max-width:480px){
+    .info-grid{grid-template-columns:1fr;}
+  }
+  @media (max-width:640px){
+    .doc-footer{
+      position:sticky; bottom:0; left:0; right:0;
+      background:var(--paper);
+      margin:24px -22px -32px;
+      padding:14px 22px calc(14px + env(safe-area-inset-bottom));
+      box-shadow:0 -4px 16px rgba(20,30,50,.10);
+      flex-direction:column; align-items:stretch; gap:10px;
+      border-top:1px solid var(--line);
+    }
+    #finish-btn{width:100%; padding:15px;}
+    #score-line{text-align:center;}
+  }
+</style>
+</head>
+<body>
+  <div class="preview-wrap">
+    <div class="sheet" id="sheet">
+      <h1 class="doc-title">${escapeHTML(title)}</h1>
+      <p class="doc-subtitle">${escapeHTML(disciplina)}</p>
+      <div class="doc-rule"></div>
+      <div class="doc-instructions"><b>📋 INSTRUÇÕES:</b> ${escapeHTML(instructions)} Ao final, clique em <b>Finalizar prova</b> — um arquivo será baixado. Envie esse arquivo para o(a) professor(a).</div>
+
+      <div class="info-grid">
+        <div class="name-field"><label>Nome completo</label><input id="student-name" placeholder="Digite seu nome" autocomplete="off"></div>
+        <div class="name-field"><label>Número / Matrícula</label><input id="student-numero" placeholder="ex: 12" autocomplete="off"></div>
+        <div class="name-field"><label>Turma</label><input id="student-turma" value="${escapeHTML(turma)}" autocomplete="off"></div>
+        <div class="name-field"><label>Professor(a)</label><div class="static">${escapeHTML(professor || '-')}</div></div>
+      </div>
+
+      <div class="progress-label">Progresso</div>
+      <div class="progress-track">${progressHTML}</div>
+
+      <div id="questions">${questionsHTML}</div>
+
+      <div class="doc-footer">
+        <span id="score-line">0 de ${questions.length} respondidas</span>
+        <button id="finish-btn" onclick="finalizarProva()">Finalizar prova</button>
+      </div>
+      <div id="done-msg">
+        ✓ Prova finalizada! Tentamos enviar/baixar o arquivo de respostas automaticamente.
+        <div class="actions">
+          <button onclick="entregarArquivo()">📤 Tentar enviar/baixar de novo</button>
+          <button id="copy-btn" onclick="copiarRespostas()">📋 Copiar código de respostas</button>
+        </div>
+        <div class="fallback-hint">Se nada abrir sozinho no seu celular, toque em "Copiar código de respostas" acima, cole numa mensagem (WhatsApp, e-mail etc.) e envie para o(a) professor(a):</div>
+        <textarea id="fallback-json" readonly></textarea>
+      </div>
+    </div>
+  </div>
+  ${studentScript}
+</body>
+</html>`;
+
+  triggerDownload('prova.html', studentHTML, 'text/html');
+
+  statusEl.textContent = 'prova.html e gabarito.json baixados! Abra o Corretor para lançar as respostas.';
+  statusEl.className = 'status ok';
+}
+
+renderFromInput();
+</script>
+</body>
+</html>
